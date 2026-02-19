@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" aria-hidden="true">
+  <defs>
+    <linearGradient id="g1" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#0ea5a4"/>
+      <stop offset="1" stop-color="#0b78ff"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#093b8c"/>
+      <stop offset="1" stop-color="#0b78ff"/>
+    </linearGradient>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- shield base -->
+  <g transform="translate(60,40)">
+    <path d="M180 10 L320 60 L320 170 C320 260 220 320 180 340 C140 320 40 260 40 170 L40 60 Z"
+      fill="url(#g1)" stroke="rgba(255,255,255,0.12)" stroke-width="4" />
+
+    <!-- inner dark layer -->
+    <path d="M180 26 L304 68 L304 170 C304 248 222 298 180 316 C138 298 56 248 56 170 L56 68 Z"
+      fill="url(#g2)" opacity="0.95" />
+
+    <!-- circuit lines (decorative) -->
+    <g stroke="rgba(255,255,255,0.15)" stroke-width="3" stroke-linecap="round" fill="none" transform="translate(80,28)">
+      <path d="M30 20 L60 20" />
+      <circle cx="30" cy="20" r="3" fill="rgba(255,255,255,0.25)" />
+      <circle cx="60" cy="20" r="3" fill="rgba(255,255,255,0.25)" />
+      <path d="M40 60 L140 60" />
+      <circle cx="40" cy="60" r="3" fill="rgba(255,255,255,0.18)" />
+      <circle cx="80" cy="60" r="3" fill="rgba(255,255,255,0.18)" />
+      <circle cx="140" cy="60" r="3" fill="rgba(255,255,255,0.18)" />
+      <path d="M120 100 L160 140" />
+      <circle cx="160" cy="140" r="3" fill="rgba(255,255,255,0.12)" />
+      <path d="M70 110 L110 110" />
+      <circle cx="110" cy="110" r="3" fill="rgba(255,255,255,0.12)" />
+    </g>
+
+    <!-- center 'X' mark -->
+    <g transform="translate(120,100)">
+      <path d="M-52 -48 L52 48" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M-52 48 L52 -48" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" />
+
+      <!-- inner cut / glow -->
+      <path d="M-40 -36 L40 36" stroke="rgba(11,120,255,0.14)" stroke-width="22" stroke-linecap="round" />
+      <path d="M-40 36 L40 -36" stroke="rgba(14,165,164,0.12)" stroke-width="22" stroke-linecap="round" />
+    </g>
+
+    <!-- subtle outer stroke glow -->
+    <path d="M180 10 L320 60 L320 170 C320 260 220 320 180 340 C140 320 40 260 40 170 L40 60 Z"
+      fill="none" stroke="rgba(11,120,255,0.08)" stroke-width="28" filter="url(#soft)" />
+  </g>
+
+  <!-- Text: only visible text is SHIELDX -->
+  <g transform="translate(360,240)">
+    <text x="0" y="0" font-family="Inter, Poppins, Arial, sans-serif" font-weight="800"
+      font-size="86" letter-spacing="6" fill="#07103b">SHIELDX</text>
+
+    <!-- small underline accent -->
+    <rect x="-2" y="12" width="330" height="8" rx="3" fill="url(#g1)" opacity="0.95" />
+  </g>
+
+  <!-- small decorative pixels to hint 'AI' / digital -->
+  <g transform="translate(680,120)" opacity="0.9">
+    <rect x="0" y="0" width="8" height="8" rx="1" fill="#0b78ff"/>
+    <rect x="18" y="10" width="6" height="6" rx="1" fill="#0ea5a4"/>
+    <rect x="36" y="-6" width="10" height="10" rx="2" fill="#0b78ff"/>
+    <rect x="58" y="8" width="6" height="6" rx="1" fill="#0ea5a4"/>
+  </g>
+</svg>

@@ -1,0 +1,17 @@
+# Scam Defender local configuration template
+# Fill in your own secrets before deployment.
+
+jwt_secret_key: "CHANGE_ME"
+database_url: "sqlite:///app/data/scam_defender.db"
+allowed_origins:
+  - "http://localhost:5173"
+  - "http://127.0.0.1:5173"
+
+integrations:
+  virustotal_api_key: ""
+  abuseipdb_api_key: ""
+  email_api_key: ""
+  sms_api_key: ""
+
+ml:
+  model_dir: "app/models"

@@ -1,0 +1,443 @@
+import { useEffect, useMemo, useState } from "react";
+import { FiAlertTriangle, FiClock, FiDatabase, FiRadio, FiShield } from "react-icons/fi";
+import { apiRequest, API_BASE } from "../api/client";
+import AppShell from "../Components/AppShell";
+import ScanCard from "../Components/ScanCard";
+import { useAuth } from "../context/AuthContext";
+
+const initialBusy = {
+  email: false,
+  message: false,
+  url: false,
+  file: false,
+  fraud: false,
+};
+
+function severityClass(severity) {
+  if (severity === "critical") {
+    return "alert-error";
+  }
+  if (severity === "high") {
+    return "alert-warning";
+  }
+  if (severity === "medium") {
+    return "alert-info";
+  }
+  return "alert-success";
+}
+
+function resultTheme(result) {
+  const severity = result?.severity || "low";
+  return severityClass(severity);
+}
+
+export default function DashboardPage() {
+  const { token } = useAuth();
+
+  const [summary, setSummary] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [busy, setBusy] = useState(initialBusy);
+  const [results, setResults] = useState({});
+  const [error, setError] = useState("");
+
+  const [emailInput, setEmailInput] = useState({ subject: "", message: "" });
+  const [messageInput, setMessageInput] = useState("");
+  const [urlInput, setUrlInput] = useState("");
+  const [fileInput, setFileInput] = useState(null);
+  const [fraudInput, setFraudInput] = useState({
+    step: 1,
+    type: "TRANSFER",
+    amount: 10000,
+    nameOrig: "C123456",
+    nameDest: "C654321",
+  });
+
+  const totalStats = useMemo(() => {
+    if (!summary) {
+      return [
+        { label: "Total Scans", value: "-", icon: FiDatabase },
+        { label: "Threat Scans", value: "-", icon: FiAlertTriangle },
+        { label: "Recent (7d)", value: "-", icon: FiClock },
+        { label: "Open Alerts", value: "-", icon: FiRadio },
+      ];
+    }
+
+    return [
+      { label: "Total Scans", value: summary.totals.total_scans, icon: FiDatabase },
+      { label: "Threat Scans", value: summary.totals.threat_scans, icon: FiShield },
+      { label: "Recent (7d)", value: summary.totals.recent_scans_7d, icon: FiClock },
+      { label: "Open Alerts", value: summary.totals.open_alerts, icon: FiAlertTriangle },
+    ];
+  }, [summary]);
+
+  async function loadDashboard() {
+    try {
+      const [summaryPayload, historyPayload, alertPayload] = await Promise.all([
+        apiRequest("/dashboard/summary", { token }),
+        apiRequest("/dashboard/history?limit=20", { token }),
+        apiRequest("/alerts", { token }),
+      ]);
+
+      setSummary(summaryPayload);
+      setHistory(historyPayload.items || []);
+      setAlerts(alertPayload.items || []);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  useEffect(() => {
+    if (!token) {
+      return undefined;
+    }
+
+    loadDashboard();
+
+    const stream = new EventSource(`${API_BASE}/stream/alerts?token=${encodeURIComponent(token)}`);
+
+    stream.addEventListener("alert", (event) => {
+      try {
+        const alert = JSON.parse(event.data);
+        setAlerts((previous) => [alert, ...previous].slice(0, 100));
+      } catch {
+        // no-op
+      }
+    });
+
+    stream.onerror = () => {
+      stream.close();
+    };
+
+    return () => {
+      stream.close();
+    };
+  }, [token]);
+
+  async function runScan(scanType, requestFactory) {
+    setError("");
+    setBusy((previous) => ({ ...previous, [scanType]: true }));
+
+    try {
+      const result = await requestFactory();
+      setResults((previous) => ({
+        ...previous,
+        [scanType]: {
+          ...result,
+          severityClass: resultTheme(result),
+        },
+      }));
+      await loadDashboard();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy((previous) => ({ ...previous, [scanType]: false }));
+    }
+  }
+
+  async function acknowledgeAlert(alertId) {
+    try {
+      await apiRequest(`/alerts/${alertId}/ack`, { method: "PATCH", token });
+      setAlerts((previous) =>
+        previous.map((alert) => (alert.id === alertId ? { ...alert, acknowledged: true } : alert))
+      );
+      await loadDashboard();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  return (
+    <AppShell title="Threat Operations Dashboard">
+      <section className="dashboard-grid">
+        <article className="dashboard-banner glass-panel">
+          <div>
+            <h3 className="panel-title">Unified Scam Defense Console</h3>
+            <p className="panel-subtitle">
+              Run real-time scans across email, message, URL, file, and transaction channels from one control plane.
+            </p>
+          </div>
+          <span className="badge badge-info">Live Monitoring</span>
+        </article>
+
+        <div className="stat-grid">
+          {totalStats.map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <article key={stat.label} className="stat-card glass-panel">
+                <Icon />
+                <div>
+                  <h4 className="stat-label">{stat.label}</h4>
+                  <strong className="stat-value">{stat.value}</strong>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
+        {error ? (
+          <div className="alert alert-error">
+            <span>{error}</span>
+          </div>
+        ) : null}
+
+        <div className="scanners-grid">
+          <ScanCard
+            title="Email Scanner"
+            description="DistilBERT phishing and spam detection with confidence scoring."
+            onSubmit={() =>
+              runScan("email", () =>
+                apiRequest("/scan/email", {
+                  method: "POST",
+                  token,
+                  body: emailInput,
+                })
+              )
+            }
+            busy={busy.email}
+            result={results.email}
+          >
+            <label className="ui-field">
+              <span className="ui-label">Email Subject</span>
+              <input
+                className="ui-control ui-input"
+                placeholder="Subject"
+                value={emailInput.subject}
+                onChange={(event) => setEmailInput((prev) => ({ ...prev, subject: event.target.value }))}
+              />
+            </label>
+            <label className="ui-field">
+              <span className="ui-label">Email Body</span>
+              <textarea
+                className="ui-control ui-textarea"
+                rows={4}
+                placeholder="Paste full email body"
+                value={emailInput.message}
+                onChange={(event) => setEmailInput((prev) => ({ ...prev, message: event.target.value }))}
+              />
+            </label>
+          </ScanCard>
+
+          <ScanCard
+            title="Message Scanner"
+            description="SMS and chat scam detection with TF-IDF + Random Forest model."
+            onSubmit={() =>
+              runScan("message", () =>
+                apiRequest("/scan/message", {
+                  method: "POST",
+                  token,
+                  body: { message: messageInput },
+                })
+              )
+            }
+            busy={busy.message}
+            result={results.message}
+          >
+            <label className="ui-field">
+              <span className="ui-label">Message Content</span>
+              <textarea
+                className="ui-control ui-textarea"
+                rows={5}
+                placeholder="Paste suspicious SMS or chat message"
+                value={messageInput}
+                onChange={(event) => setMessageInput(event.target.value)}
+              />
+            </label>
+          </ScanCard>
+
+          <ScanCard
+            title="URL Scanner"
+            description="Lexical + XGBoost multi-class malicious URL classification."
+            onSubmit={() =>
+              runScan("url", () =>
+                apiRequest("/scan/url", {
+                  method: "POST",
+                  token,
+                  body: { url: urlInput },
+                })
+              )
+            }
+            busy={busy.url}
+            result={results.url}
+          >
+            <label className="ui-field">
+              <span className="ui-label">Target URL</span>
+              <input
+                className="ui-control ui-input"
+                placeholder="https://example.com"
+                value={urlInput}
+                onChange={(event) => setUrlInput(event.target.value)}
+              />
+            </label>
+          </ScanCard>
+
+          <ScanCard
+            title="File Malware Scanner"
+            description="PE static analysis with XGBoost + Random Forest ensemble."
+            onSubmit={() =>
+              runScan("file", async () => {
+                const formData = new FormData();
+                if (fileInput) {
+                  formData.append("file", fileInput);
+                }
+                return apiRequest("/scan/file", {
+                  method: "POST",
+                  token,
+                  body: formData,
+                });
+              })
+            }
+            busy={busy.file}
+            result={results.file}
+          >
+            <label className="ui-field">
+              <span className="ui-label">Upload PE File</span>
+              <input
+                type="file"
+                className="ui-control ui-file"
+                onChange={(event) => setFileInput(event.target.files?.[0] || null)}
+              />
+            </label>
+          </ScanCard>
+
+          <ScanCard
+            title="Fraud Transaction Scanner"
+            description="Behavioral + anomaly scoring for real-time financial fraud."
+            onSubmit={() =>
+              runScan("fraud", () =>
+                apiRequest("/scan/fraud", {
+                  method: "POST",
+                  token,
+                  body: {
+                    ...fraudInput,
+                    amount: Number(fraudInput.amount),
+                    step: Number(fraudInput.step),
+                  },
+                })
+              )
+            }
+            busy={busy.fraud}
+            result={results.fraud}
+          >
+            <div className="fraud-form-grid">
+              <label className="ui-field">
+                <span className="ui-label">Step</span>
+                <input
+                  className="ui-control ui-input"
+                  type="number"
+                  min="1"
+                  placeholder="Step"
+                  value={fraudInput.step}
+                  onChange={(event) => setFraudInput((prev) => ({ ...prev, step: event.target.value }))}
+                />
+              </label>
+
+              <label className="ui-field">
+                <span className="ui-label">Type</span>
+                <select
+                  className="ui-control ui-select"
+                  value={fraudInput.type}
+                  onChange={(event) => setFraudInput((prev) => ({ ...prev, type: event.target.value }))}
+                >
+                  <option value="TRANSFER">TRANSFER</option>
+                  <option value="CASH_OUT">CASH_OUT</option>
+                  <option value="PAYMENT">PAYMENT</option>
+                  <option value="DEBIT">DEBIT</option>
+                  <option value="CASH_IN">CASH_IN</option>
+                </select>
+              </label>
+
+              <label className="ui-field">
+                <span className="ui-label">Amount</span>
+                <input
+                  className="ui-control ui-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Amount"
+                  value={fraudInput.amount}
+                  onChange={(event) => setFraudInput((prev) => ({ ...prev, amount: event.target.value }))}
+                />
+              </label>
+
+              <label className="ui-field">
+                <span className="ui-label">Origin Account</span>
+                <input
+                  className="ui-control ui-input"
+                  placeholder="Origin Account"
+                  value={fraudInput.nameOrig}
+                  onChange={(event) => setFraudInput((prev) => ({ ...prev, nameOrig: event.target.value }))}
+                />
+              </label>
+
+              <label className="ui-field">
+                <span className="ui-label">Destination Account</span>
+                <input
+                  className="ui-control ui-input"
+                  placeholder="Destination Account"
+                  value={fraudInput.nameDest}
+                  onChange={(event) => setFraudInput((prev) => ({ ...prev, nameDest: event.target.value }))}
+                />
+              </label>
+            </div>
+          </ScanCard>
+        </div>
+
+        <div className="history-alert-grid">
+          <article className="glass-panel history-card">
+            <header className="section-header">
+              <h3 className="panel-title">Recent Scan History</h3>
+              <span className="badge badge-outline">{history.length} entries</span>
+            </header>
+
+            <div className="history-list">
+              {history.length === 0 ? (
+                <p>No scans yet. Run a scan to build your timeline.</p>
+              ) : (
+                history.map((item) => (
+                  <div key={item.id} className={`history-item ${item.severity}`}>
+                    <div>
+                      <strong>{item.scan_type.toUpperCase()}</strong>
+                      <p>{item.verdict} · Risk {item.risk_score}%</p>
+                    </div>
+                    <small>{new Date(item.created_at).toLocaleString()}</small>
+                  </div>
+                ))
+              )}
+            </div>
+          </article>
+
+          <article className="glass-panel alerts-card">
+            <header className="section-header">
+              <h3 className="panel-title">Live Alerts</h3>
+              <span className="badge badge-outline">{alerts.length} alerts</span>
+            </header>
+
+            <div className="alerts-list">
+              {alerts.length === 0 ? (
+                <p>No active alerts.</p>
+              ) : (
+                alerts.map((alert) => (
+                  <div key={alert.id} className={`alert ${severityClass(alert.severity)}`}>
+                    <div>
+                      <strong>{alert.title}</strong>
+                      <p>{alert.message}</p>
+                      <small>{new Date(alert.created_at).toLocaleString()}</small>
+                    </div>
+                    {!alert.acknowledged ? (
+                      <button className="btn btn-xs btn-neutral" onClick={() => acknowledgeAlert(alert.id)}>
+                        Acknowledge
+                      </button>
+                    ) : (
+                      <span className="badge badge-success">Acknowledged</span>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </article>
+        </div>
+      </section>
+    </AppShell>
+  );
+}

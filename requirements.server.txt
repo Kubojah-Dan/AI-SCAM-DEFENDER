@@ -1,0 +1,4 @@
+-r requirements.txt
+
+gunicorn==23.0.0
+alembic==1.15.2

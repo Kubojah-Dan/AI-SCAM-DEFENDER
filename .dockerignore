@@ -1,0 +1,28 @@
+# ─ ignore Python venv, git, caches ─────────────────
+venv
+.git
+__pycache__
+*.pyc
+
+# ─ ignore your ML artifacts and data ───────────────
+app/datasets
+
+# ─ ignore Airflow‑docker state & logs ─────────────
+airflow-docker/logs
+airflow-docker/airflow-docker-*.log*
+
+
+# ─── Python virtual env ─────────────────────────────
+venv/
+# ─── Model artifacts & pickles ───────────────────────
+app/models/*.pkl
+# ─── Raw datasets ────────────────────────────────────
+app/datasets/*.csv
+# ─── SQLite DB ───────────────────────────────────────
+app/data/predictions.db
+# ─── Git metadata & logs ─────────────────────────────
+.git
+.gitignore
+Dockerfile*
+docker-compose*.yml
+logs/

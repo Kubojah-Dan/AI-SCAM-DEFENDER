@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: scam_defender
+      POSTGRES_USER: scam_admin
+      POSTGRES_PASSWORD: scam_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    environment:
+      DATABASE_URL: postgresql+psycopg2://scam_admin:scam_password@postgres:5432/scam_defender
+      JWT_SECRET_KEY: change-this-in-env
+      ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      MODEL_DIR: /app/app/models
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    ports:
+      - "5000:5000"
+    depends_on:
+      - postgres
+      - redis
+
+  frontend:
+    image: node:20
+    working_dir: /workspace/frontend
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    volumes:
+      - ./frontend:/workspace/frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
