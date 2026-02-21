@@ -91,3 +91,59 @@ class Feedback(TimestampMixin, db.Model):
     subject = db.Column(db.String(160), nullable=False, default="")
     message = db.Column(db.Text, nullable=False)
     contact_email = db.Column(db.String(255), nullable=False, default="")
+
+
+class ThreatReport(TimestampMixin, db.Model):
+    __tablename__ = "threat_reports"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    
+    # Content details
+    content_type = db.Column(db.String(30), nullable=False)  # url, email, message, file
+    content = db.Column(db.Text, nullable=False)
+    original_result = db.Column(db.JSON, nullable=True)
+    
+    # Report details
+    status = db.Column(db.String(30), nullable=False, default="pending")  # pending, confirmed, false_positive
+    report_count = db.Column(db.Integer, nullable=False, default=1)
+    is_urgent = db.Column(db.Boolean, nullable=False, default=False)
+    
+    # User feedback
+    comment = db.Column(db.Text, nullable=True)
+    reporter_name = db.Column(db.String(255), nullable=False, default="Anonymous User")
+    
+    # Review details
+    reviewed_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    review_notes = db.Column(db.Text, nullable=True)
+    
+    # ML training data
+    added_to_training = db.Column(db.Boolean, nullable=False, default=False)
+    training_data_quality = db.Column(db.Integer, nullable=True)  # 1-5 rating
+    
+    # Relationships
+    reviewer = db.relationship("User", foreign_keys=[reviewed_by], backref="reviewed_reports")
+
+
+class UserFeedback(TimestampMixin, db.Model):
+    __tablename__ = "user_feedback"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    
+    # Original scan/result
+    scan_type = db.Column(db.String(30), nullable=False)
+    original_result = db.Column(db.JSON, nullable=False)
+    
+    # User feedback
+    feedback_type = db.Column(db.String(30), nullable=False)  # mark_safe, confirm_threat
+    comment = db.Column(db.Text, nullable=True)
+    
+    # System response
+    processed = db.Column(db.Boolean, nullable=False, default=False)
+    action_taken = db.Column(db.String(100), nullable=True)
+    
+    # ML improvement
+    added_to_training_queue = db.Column(db.Boolean, nullable=False, default=False)
+    training_priority = db.Column(db.Integer, nullable=False, default=1)  # 1-5

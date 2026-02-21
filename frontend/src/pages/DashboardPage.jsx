@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { FiAlertTriangle, FiClock, FiDatabase, FiRadio, FiShield } from "react-icons/fi";
+import { FiAlertTriangle, FiClock, FiDatabase, FiRadio, FiShield, FiUsers, FiGlobe, FiBarChart2, FiActivity, FiSend } from "react-icons/fi";
+import { Link } from "react-router-dom";
 import { apiRequest, API_BASE } from "../api/client";
 import AppShell from "../Components/AppShell";
 import ScanCard from "../Components/ScanCard";
+import EnhancedScanResult from "../Components/EnhancedScanResult";
+import ThreatReportModal from "../Components/ThreatReportModal";
+import { useToast } from "../Components/Toast";
 import { useAuth } from "../context/AuthContext";
 
 const initialBusy = {
@@ -33,6 +37,7 @@ function resultTheme(result) {
 
 export default function DashboardPage() {
   const { token } = useAuth();
+  const { showSuccess, showError, showWarning } = useToast();
 
   const [summary, setSummary] = useState(null);
   const [history, setHistory] = useState([]);
@@ -40,6 +45,9 @@ export default function DashboardPage() {
   const [busy, setBusy] = useState(initialBusy);
   const [results, setResults] = useState({});
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState('scanners');
+  const [showThreatModal, setShowThreatModal] = useState(false);
+  const [modalData, setModalData] = useState({});
 
   const [emailInput, setEmailInput] = useState({ subject: "", message: "" });
   const [messageInput, setMessageInput] = useState("");
@@ -142,10 +150,49 @@ export default function DashboardPage() {
         previous.map((alert) => (alert.id === alertId ? { ...alert, acknowledged: true } : alert))
       );
       await loadDashboard();
+      showSuccess("Alert acknowledged successfully");
     } catch (err) {
       setError(err.message);
+      showError("Failed to acknowledge alert");
     }
   }
+
+  const handleReportThreat = (result, scanType) => {
+    setModalData({ result, scanType });
+    setShowThreatModal(true);
+  };
+
+  const handleMarkSafe = async (result, scanType) => {
+    try {
+      await apiRequest('/feedback/mark-safe', {
+        method: 'POST',
+        token,
+        body: {
+          scanType,
+          originalResult: result,
+          timestamp: new Date().toISOString()
+        }
+      });
+      showSuccess('Thank you for helping improve Scam Defender!');
+      await loadDashboard();
+    } catch (err) {
+      showError('Failed to mark as safe');
+    }
+  };
+
+  const handleThreatReportSubmit = async (reportData) => {
+    try {
+      await apiRequest('/report-threat', {
+        method: 'POST',
+        token,
+        body: reportData
+      });
+      showSuccess('Threat report submitted successfully. Thank you for helping keep our community safe!');
+      await loadDashboard();
+    } catch (err) {
+      showError('Failed to submit threat report');
+    }
+  };
 
   return (
     <AppShell title="Threat Operations Dashboard">
@@ -175,213 +222,303 @@ export default function DashboardPage() {
           })}
         </div>
 
+        {/* Navigation Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <Link
+            to="/report"
+            className="bg-red-900/30 border border-red-600/50 rounded-lg p-4 hover:border-red-500 transition-colors group"
+          >
+            <div className="flex items-center space-x-3">
+              <FiSend className="w-8 h-8 text-red-400 group-hover:text-red-300" />
+              <div>
+                <h3 className="text-white font-semibold">Report Threat</h3>
+                <p className="text-gray-400 text-sm">Submit malicious threats you've experienced</p>
+              </div>
+            </div>
+          </Link>
+          
+          <Link
+            to="/team"
+            className="bg-gray-800 border border-gray-700 rounded-lg p-4 hover:border-blue-500 transition-colors group"
+          >
+            <div className="flex items-center space-x-3">
+              <FiUsers className="w-8 h-8 text-blue-400 group-hover:text-blue-300" />
+              <div>
+                <h3 className="text-white font-semibold">Team Collaboration</h3>
+                <p className="text-gray-400 text-sm">Real-time team chat and threat sharing</p>
+              </div>
+            </div>
+          </Link>
+          
+          <Link
+            to="/intelligence"
+            className="bg-gray-800 border border-gray-700 rounded-lg p-4 hover:border-green-500 transition-colors group"
+          >
+            <div className="flex items-center space-x-3">
+              <FiGlobe className="w-8 h-8 text-green-400 group-hover:text-green-300" />
+              <div>
+                <h3 className="text-white font-semibold">Threat Intelligence</h3>
+                <p className="text-gray-400 text-sm">External feeds and IOC management</p>
+              </div>
+            </div>
+          </Link>
+          
+          <Link
+            to="/analytics"
+            className="bg-gray-800 border border-gray-700 rounded-lg p-4 hover:border-purple-500 transition-colors group"
+          >
+            <div className="flex items-center space-x-3">
+              <FiBarChart2 className="w-8 h-8 text-purple-400 group-hover:text-purple-300" />
+              <div>
+                <h3 className="text-white font-semibold">Advanced Analytics</h3>
+                <p className="text-gray-400 text-sm">Comprehensive threat analysis and metrics</p>
+              </div>
+            </div>
+          </Link>
+          
+          <Link
+            to="/response"
+            className="bg-gray-800 border border-gray-700 rounded-lg p-4 hover:border-orange-500 transition-colors group"
+          >
+            <div className="flex items-center space-x-3">
+              <FiActivity className="w-8 h-8 text-orange-400 group-hover:text-orange-300" />
+              <div>
+                <h3 className="text-white font-semibold">Incident Response</h3>
+                <p className="text-gray-400 text-sm">Automated workflows and incident management</p>
+              </div>
+            </div>
+          </Link>
+          
+          <Link
+            to="/community"
+            className="bg-gray-800 border border-gray-700 rounded-lg p-4 hover:border-cyan-500 transition-colors group"
+          >
+            <div className="flex items-center space-x-3">
+              <FiDatabase className="w-8 h-8 text-cyan-400 group-hover:text-cyan-300" />
+              <div>
+                <h3 className="text-white font-semibold">Community Feed</h3>
+                <p className="text-gray-400 text-sm">User-reported threats and moderation</p>
+              </div>
+            </div>
+          </Link>
+        </div>
+
         {error ? (
-          <div className="alert alert-error">
+          <div className="alert alert-error mb-6">
             <span>{error}</span>
           </div>
         ) : null}
 
-        <div className="scanners-grid">
-          <ScanCard
-            title="Email Scanner"
-            description="DistilBERT phishing and spam detection with confidence scoring."
-            onSubmit={() =>
-              runScan("email", () =>
-                apiRequest("/scan/email", {
-                  method: "POST",
-                  token,
-                  body: emailInput,
-                })
-              )
-            }
-            busy={busy.email}
-            result={results.email}
-          >
-            <label className="ui-field">
-              <span className="ui-label">Email Subject</span>
-              <input
-                className="ui-control ui-input"
-                placeholder="Subject"
-                value={emailInput.subject}
-                onChange={(event) => setEmailInput((prev) => ({ ...prev, subject: event.target.value }))}
-              />
-            </label>
-            <label className="ui-field">
-              <span className="ui-label">Email Body</span>
-              <textarea
-                className="ui-control ui-textarea"
-                rows={4}
-                placeholder="Paste full email body"
-                value={emailInput.message}
-                onChange={(event) => setEmailInput((prev) => ({ ...prev, message: event.target.value }))}
-              />
-            </label>
-          </ScanCard>
-
-          <ScanCard
-            title="Message Scanner"
-            description="SMS and chat scam detection with TF-IDF + Random Forest model."
-            onSubmit={() =>
-              runScan("message", () =>
-                apiRequest("/scan/message", {
-                  method: "POST",
-                  token,
-                  body: { message: messageInput },
-                })
-              )
-            }
-            busy={busy.message}
-            result={results.message}
-          >
-            <label className="ui-field">
-              <span className="ui-label">Message Content</span>
-              <textarea
-                className="ui-control ui-textarea"
-                rows={5}
-                placeholder="Paste suspicious SMS or chat message"
-                value={messageInput}
-                onChange={(event) => setMessageInput(event.target.value)}
-              />
-            </label>
-          </ScanCard>
-
-          <ScanCard
-            title="URL Scanner"
-            description="Lexical + XGBoost multi-class malicious URL classification."
-            onSubmit={() =>
-              runScan("url", () =>
-                apiRequest("/scan/url", {
-                  method: "POST",
-                  token,
-                  body: { url: urlInput },
-                })
-              )
-            }
-            busy={busy.url}
-            result={results.url}
-          >
-            <label className="ui-field">
-              <span className="ui-label">Target URL</span>
-              <input
-                className="ui-control ui-input"
-                placeholder="https://example.com"
-                value={urlInput}
-                onChange={(event) => setUrlInput(event.target.value)}
-              />
-            </label>
-          </ScanCard>
-
-          <ScanCard
-            title="File Malware Scanner"
-            description="PE static analysis with XGBoost + Random Forest ensemble."
-            onSubmit={() =>
-              runScan("file", async () => {
-                const formData = new FormData();
-                if (fileInput) {
-                  formData.append("file", fileInput);
-                }
-                return apiRequest("/scan/file", {
-                  method: "POST",
-                  token,
-                  body: formData,
-                });
+        <ScanCard
+          title="Email Scanner"
+          description="DistilBERT phishing and spam detection with confidence scoring."
+          onSubmit={() =>
+            runScan("email", () =>
+              apiRequest("/scan/email", {
+                method: "POST",
+                token,
+                body: emailInput,
               })
-            }
-            busy={busy.file}
-            result={results.file}
-          >
+            )
+          }
+          busy={busy.email}
+          result={results.email}
+        >
+          <label className="ui-field">
+            <span className="ui-label">Email Subject</span>
+            <input
+              className="ui-control ui-input"
+              placeholder="Subject"
+              value={emailInput.subject}
+              onChange={(event) => setEmailInput((prev) => ({ ...prev, subject: event.target.value }))}
+            />
+          </label>
+          <label className="ui-field">
+            <span className="ui-label">Email Body</span>
+            <textarea
+              className="ui-control ui-textarea"
+              rows={4}
+              placeholder="Paste full email body"
+              value={emailInput.message}
+              onChange={(event) => setEmailInput((prev) => ({ ...prev, message: event.target.value }))}
+            />
+          </label>
+        </ScanCard>
+
+        <ScanCard
+          title="Message Scanner"
+          description="SMS and chat scam detection with TF-IDF + Random Forest model."
+          onSubmit={() =>
+            runScan("message", () =>
+              apiRequest("/scan/message", {
+                method: "POST",
+                token,
+                body: { message: messageInput },
+              })
+            )
+          }
+          busy={busy.message}
+          result={results.message}
+        >
+          <label className="ui-field">
+            <span className="ui-label">Message Content</span>
+            <textarea
+              className="ui-control ui-textarea"
+              rows={5}
+              placeholder="Paste suspicious SMS or chat message"
+              value={messageInput}
+              onChange={(event) => setMessageInput(event.target.value)}
+            />
+          </label>
+        </ScanCard>
+
+        <ScanCard
+          title="URL Scanner"
+          description="Lexical + XGBoost multi-class malicious URL classification."
+          onSubmit={() =>
+            runScan("url", () =>
+              apiRequest("/scan/url", {
+                method: "POST",
+                token,
+                body: { url: urlInput },
+              })
+            )
+          }
+          busy={busy.url}
+          result={results.url}
+        >
+          <label className="ui-field">
+            <span className="ui-label">Target URL</span>
+            <input
+              className="ui-control ui-input"
+              placeholder="https://example.com"
+              value={urlInput}
+              onChange={(event) => setUrlInput(event.target.value)}
+            />
+          </label>
+        </ScanCard>
+
+        <ScanCard
+          title="File Malware Scanner"
+          description="PE static analysis with XGBoost + Random Forest ensemble."
+          onSubmit={() =>
+            runScan("file", async () => {
+              const formData = new FormData();
+              if (fileInput) {
+                formData.append("file", fileInput);
+              }
+              return apiRequest("/scan/file", {
+                method: "POST",
+                token,
+                body: formData,
+              });
+            })
+          }
+          busy={busy.file}
+          result={results.file}
+        >
+          <label className="ui-field">
+            <span className="ui-label">Upload PE File</span>
+            <input
+              type="file"
+              className="ui-control ui-file"
+              onChange={(event) => setFileInput(event.target.files?.[0] || null)}
+            />
+          </label>
+        </ScanCard>
+
+        <ScanCard
+          title="Fraud Transaction Scanner"
+          description="Behavioral + anomaly scoring for real-time financial fraud."
+          onSubmit={() =>
+            runScan("fraud", () =>
+              apiRequest("/scan/fraud", {
+                method: "POST",
+                token,
+                body: {
+                  ...fraudInput,
+                  amount: Number(fraudInput.amount),
+                  step: Number(fraudInput.step),
+                },
+              })
+            )
+          }
+          busy={busy.fraud}
+          result={results.fraud}
+        >
+          <div className="fraud-form-grid">
             <label className="ui-field">
-              <span className="ui-label">Upload PE File</span>
+              <span className="ui-label">Step</span>
               <input
-                type="file"
-                className="ui-control ui-file"
-                onChange={(event) => setFileInput(event.target.files?.[0] || null)}
+                className="ui-control ui-input"
+                type="number"
+                min="1"
+                placeholder="Step"
+                value={fraudInput.step}
+                onChange={(event) => setFraudInput((prev) => ({ ...prev, step: event.target.value }))}
               />
             </label>
-          </ScanCard>
 
-          <ScanCard
-            title="Fraud Transaction Scanner"
-            description="Behavioral + anomaly scoring for real-time financial fraud."
-            onSubmit={() =>
-              runScan("fraud", () =>
-                apiRequest("/scan/fraud", {
-                  method: "POST",
-                  token,
-                  body: {
-                    ...fraudInput,
-                    amount: Number(fraudInput.amount),
-                    step: Number(fraudInput.step),
-                  },
-                })
-              )
-            }
-            busy={busy.fraud}
-            result={results.fraud}
-          >
-            <div className="fraud-form-grid">
-              <label className="ui-field">
-                <span className="ui-label">Step</span>
-                <input
-                  className="ui-control ui-input"
-                  type="number"
-                  min="1"
-                  placeholder="Step"
-                  value={fraudInput.step}
-                  onChange={(event) => setFraudInput((prev) => ({ ...prev, step: event.target.value }))}
-                />
-              </label>
+            <label className="ui-field">
+              <span className="ui-label">Type</span>
+              <select
+                className="ui-control ui-select"
+                value={fraudInput.type}
+                onChange={(event) => setFraudInput((prev) => ({ ...prev, type: event.target.value }))}
+              >
+                <option value="TRANSFER">TRANSFER</option>
+                <option value="CASH_OUT">CASH_OUT</option>
+                <option value="PAYMENT">PAYMENT</option>
+                <option value="DEBIT">DEBIT</option>
+                <option value="CASH_IN">CASH_IN</option>
+              </select>
+            </label>
 
-              <label className="ui-field">
-                <span className="ui-label">Type</span>
-                <select
-                  className="ui-control ui-select"
-                  value={fraudInput.type}
-                  onChange={(event) => setFraudInput((prev) => ({ ...prev, type: event.target.value }))}
-                >
-                  <option value="TRANSFER">TRANSFER</option>
-                  <option value="CASH_OUT">CASH_OUT</option>
-                  <option value="PAYMENT">PAYMENT</option>
-                  <option value="DEBIT">DEBIT</option>
-                  <option value="CASH_IN">CASH_IN</option>
-                </select>
-              </label>
+            <label className="ui-field">
+              <span className="ui-label">Amount</span>
+              <input
+                className="ui-control ui-input"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Amount"
+                value={fraudInput.amount}
+                onChange={(event) => setFraudInput((prev) => ({ ...prev, amount: event.target.value }))}
+              />
+            </label>
 
-              <label className="ui-field">
-                <span className="ui-label">Amount</span>
-                <input
-                  className="ui-control ui-input"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="Amount"
-                  value={fraudInput.amount}
-                  onChange={(event) => setFraudInput((prev) => ({ ...prev, amount: event.target.value }))}
-                />
-              </label>
+            <label className="ui-field">
+              <span className="ui-label">Origin Account</span>
+              <input
+                className="ui-control ui-input"
+                placeholder="Origin Account"
+                value={fraudInput.nameOrig}
+                onChange={(event) => setFraudInput((prev) => ({ ...prev, nameOrig: event.target.value }))}
+              />
+            </label>
 
-              <label className="ui-field">
-                <span className="ui-label">Origin Account</span>
-                <input
-                  className="ui-control ui-input"
-                  placeholder="Origin Account"
-                  value={fraudInput.nameOrig}
-                  onChange={(event) => setFraudInput((prev) => ({ ...prev, nameOrig: event.target.value }))}
-                />
-              </label>
+            <label className="ui-field">
+              <span className="ui-label">Destination Account</span>
+              <input
+                className="ui-control ui-input"
+                placeholder="Destination Account"
+                value={fraudInput.nameDest}
+                onChange={(event) => setFraudInput((prev) => ({ ...prev, nameDest: event.target.value }))}
+              />
+            </label>
+          </div>
+        </ScanCard>
 
-              <label className="ui-field">
-                <span className="ui-label">Destination Account</span>
-                <input
-                  className="ui-control ui-input"
-                  placeholder="Destination Account"
-                  value={fraudInput.nameDest}
-                  onChange={(event) => setFraudInput((prev) => ({ ...prev, nameDest: event.target.value }))}
-                />
-              </label>
-            </div>
-          </ScanCard>
-        </div>
+        {/* Enhanced Results Display */}
+        {Object.entries(results).map(([scanType, result]) => (
+          <EnhancedScanResult
+            key={scanType}
+            result={result}
+            scanType={scanType}
+            onReportThreat={handleReportThreat}
+            onMarkSafe={handleMarkSafe}
+          />
+        ))}
 
         <div className="history-alert-grid">
           <article className="glass-panel history-card">
@@ -438,6 +575,15 @@ export default function DashboardPage() {
           </article>
         </div>
       </section>
+
+      {/* Threat Report Modal */}
+      <ThreatReportModal
+        isOpen={showThreatModal}
+        onClose={() => setShowThreatModal(false)}
+        onSubmit={handleThreatReportSubmit}
+        scanResult={modalData.result}
+        scanType={modalData.scanType}
+      />
     </AppShell>
   );
 }

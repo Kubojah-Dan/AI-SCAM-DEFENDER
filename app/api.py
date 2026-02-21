@@ -12,7 +12,7 @@ from flask_jwt_extended import (
 from sqlalchemy import func
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from app.models_db import Feedback, PrivacySetting, ScanRecord, ThreatAlert, User, UserProfile, db
+from app.models_db import Feedback, PrivacySetting, ScanRecord, ThreatAlert, User, UserProfile, ThreatReport, UserFeedback, db
 from app.services.model_service import ModelServiceError
 
 api_bp = Blueprint("api", __name__)
@@ -565,6 +565,235 @@ def stream_alerts():
 @api_bp.route("/models/status", methods=["GET"])
 def model_status():
     return jsonify({"models": _get_model_service().get_status()})
+
+
+# Threat Reporting and Feedback Endpoints
+
+@api_bp.route("/report-threat", methods=["POST"])
+@jwt_required()
+def report_threat():
+    user = _current_user()
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({"msg": "No data provided"}), 400
+    
+    # Extract required fields
+    content_type = data.get("contentType")
+    comment = data.get("comment", "")
+    is_urgent = data.get("isUrgent", False)
+    original_result = data.get("originalResult", {})
+    scan_type = data.get("scanType")
+    
+    if not content_type:
+        return jsonify({"msg": "Content type is required"}), 400
+    
+    # Extract content from original result
+    content = ""
+    if scan_type == "url" and original_result.get("url"):
+        content = original_result["url"]
+    elif scan_type == "email" and original_result.get("subject"):
+        content = f"Subject: {original_result['subject']}"
+        if original_result.get("message"):
+            content += f"\n{original_result['message']}"
+    elif scan_type == "message" and original_result.get("message_text"):
+        content = original_result["message_text"]
+    elif scan_type == "file" and original_result.get("filename"):
+        content = original_result["filename"]
+    
+    # Check if this content has already been reported
+    existing_report = ThreatReport.query.filter_by(
+        content_type=content_type,
+        content=content
+    ).first()
+    
+    if existing_report:
+        # Increment report count
+        existing_report.report_count += 1
+        if is_urgent:
+            existing_report.is_urgent = True
+        if comment:
+            existing_report.comment = f"{existing_report.comment or ''}\n\nAdditional report: {comment}"
+        db.session.commit()
+        
+        return jsonify({
+            "msg": "Threat report added to existing report",
+            "report_id": existing_report.id,
+            "report_count": existing_report.report_count
+        })
+    
+    # Create new threat report
+    report = ThreatReport(
+        user_id=user.id if user else None,
+        content_type=content_type,
+        content=content,
+        original_result=original_result,
+        comment=comment,
+        is_urgent=is_urgent,
+        reporter_name=user.full_name if user else "Anonymous User"
+    )
+    
+    db.session.add(report)
+    db.session.commit()
+    
+    return jsonify({
+        "msg": "Threat report submitted successfully",
+        "report_id": report.id
+    })
+
+
+@api_bp.route("/feedback/mark-safe", methods=["POST"])
+@jwt_required()
+def mark_as_safe():
+    user = _current_user()
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({"msg": "No data provided"}), 400
+    
+    scan_type = data.get("scanType")
+    original_result = data.get("originalResult", {})
+    
+    if not scan_type or not original_result:
+        return jsonify({"msg": "Scan type and original result are required"}), 400
+    
+    # Create user feedback entry
+    feedback = UserFeedback(
+        user_id=user.id,
+        scan_type=scan_type,
+        original_result=original_result,
+        feedback_type="mark_safe",
+        comment="User marked this as safe",
+        training_priority=3  # Medium priority for ML improvement
+    )
+    
+    db.session.add(feedback)
+    db.session.commit()
+    
+    return jsonify({
+        "msg": "Feedback recorded. Thank you for helping improve Scam Defender!",
+        "feedback_id": feedback.id
+    })
+
+
+@api_bp.route("/community/threats", methods=["GET"])
+def community_threats():
+    # Get query parameters
+    status_filter = request.args.get("status", "all")
+    limit = min(int(request.args.get("limit", 50)), 100)
+    
+    # Build query
+    query = ThreatReport.query
+    
+    if status_filter != "all":
+        query = query.filter_by(status=status_filter)
+    
+    # Get recent threats
+    threats = query.order_by(ThreatReport.created_at.desc()).limit(limit).all()
+    
+    # Calculate stats
+    today = dt.datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    stats = {
+        "reportedToday": ThreatReport.query.filter(ThreatReport.created_at >= today).count(),
+        "confirmedThreats": ThreatReport.query.filter_by(status="confirmed").count(),
+        "underReview": ThreatReport.query.filter_by(status="pending").count()
+    }
+    
+    # Format threats
+    threat_data = []
+    for threat in threats:
+        threat_data.append({
+            "id": threat.id,
+            "contentType": threat.content_type,
+            "content": threat.content,
+            "status": threat.status,
+            "reportCount": threat.report_count,
+            "isUrgent": threat.is_urgent,
+            "reportedAt": threat.created_at.isoformat(),
+            "reporter": threat.reporter_name,
+            "comment": threat.comment
+        })
+    
+    return jsonify({
+        "threats": threat_data,
+        "stats": stats
+    })
+
+
+@api_bp.route("/admin/review-reports", methods=["GET"])
+@jwt_required()
+def review_reports():
+    user = _current_user()
+    
+    # Check if user is admin (you might want to add an admin role to User model)
+    if not user or not user.email.endswith("@admin.com"):  # Simple admin check
+        return jsonify({"msg": "Admin access required"}), 403
+    
+    # Get pending reports
+    pending_reports = ThreatReport.query.filter_by(status="pending").order_by(
+        ThreatReport.is_urgent.desc(),
+        ThreatReport.report_count.desc(),
+        ThreatReport.created_at.desc()
+    ).limit(20).all()
+    
+    reports_data = []
+    for report in pending_reports:
+        reports_data.append({
+            "id": report.id,
+            "contentType": report.content_type,
+            "content": report.content,
+            "reportCount": report.report_count,
+            "isUrgent": report.is_urgent,
+            "reportedAt": report.created_at.isoformat(),
+            "reporter": report.reporter_name,
+            "comment": report.comment,
+            "originalResult": report.original_result
+        })
+    
+    return jsonify({
+        "reports": reports_data
+    })
+
+
+@api_bp.route("/admin/review-report/<int:report_id>", methods=["POST"])
+@jwt_required()
+def review_report(report_id):
+    user = _current_user()
+    
+    # Check if user is admin
+    if not user or not user.email.endswith("@admin.com"):
+        return jsonify({"msg": "Admin access required"}), 403
+    
+    data = request.get_json()
+    if not data:
+        return jsonify({"msg": "No data provided"}), 400
+    
+    action = data.get("action")  # "confirm" or "mark_false_positive"
+    notes = data.get("notes", "")
+    
+    report = ThreatReport.query.get_or_404(report_id)
+    
+    if action == "confirm":
+        report.status = "confirmed"
+        report.reviewed_by = user.id
+        report.reviewed_at = dt.datetime.utcnow()
+        report.review_notes = notes
+        report.added_to_training = True
+        report.training_data_quality = 4  # Good quality data
+    elif action == "mark_false_positive":
+        report.status = "false_positive"
+        report.reviewed_by = user.id
+        report.reviewed_at = dt.datetime.utcnow()
+        report.review_notes = notes
+    else:
+        return jsonify({"msg": "Invalid action"}), 400
+    
+    db.session.commit()
+    
+    return jsonify({
+        "msg": f"Report marked as {report.status}",
+        "status": report.status
+    })
 
 
 if __name__ == "__main__":

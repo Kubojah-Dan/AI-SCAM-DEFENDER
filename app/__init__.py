@@ -105,10 +105,13 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     )
 
     app.extensions["model_service"] = ModelService(app.config["MODEL_DIR"])
-
     from app.api import api_bp
+    from app.api_extended import extended_api_bp
+    from app.api_test import test_api_bp
 
     app.register_blueprint(api_bp, url_prefix="/api")
+    app.register_blueprint(extended_api_bp, url_prefix="/api")
+    app.register_blueprint(test_api_bp, url_prefix="/api")
 
     with app.app_context():
         db.create_all()
