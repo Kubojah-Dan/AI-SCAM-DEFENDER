@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FiShield, FiPlay, FiPause, FiSettings, FiAlertTriangle, FiCheckCircle, FiClock, FiActivity, FiZap, FiLock, FiDatabase } from 'react-icons/fi';
 import { useToast } from './Toast';
+import { apiRequest } from '../api/client';
 
 const IncidentResponse = () => {
   const [workflows, setWorkflows] = useState([]);
@@ -12,7 +13,21 @@ const IncidentResponse = () => {
   const loadIncidentData = async () => {
     setLoading(true);
     try {
-      // Mock incident response data
+      const token = localStorage.getItem('scam_defender_token');
+      
+      // Load incident response data from backend
+      const workflowsResponse = await apiRequest('/response/workflows', { token });
+      const incidentsResponse = await apiRequest('/response/incidents', { token });
+      const rulesResponse = await apiRequest('/response/automation-rules', { token });
+      
+      setWorkflows(workflowsResponse.workflows || []);
+      setActiveIncidents(incidentsResponse.incidents || []);
+      setAutomationRules(rulesResponse.rules || []);
+    } catch (error) {
+      console.error('Error loading incident data:', error);
+      showError('Failed to load incident response data');
+      
+      // Fallback to mock data
       setWorkflows([
         {
           id: 1,
@@ -49,31 +64,31 @@ const IncidentResponse = () => {
       setActiveIncidents([
         {
           id: 1,
-          title: 'Phishing Campaign Detected',
+          type: 'phishing',
           severity: 'high',
           status: 'responding',
-          detected_at: new Date(Date.now() - 1800000),
+          detected_at: new Date(Date.now() - 300000),
           workflow_triggered: 'High-Risk Phishing Response',
           actions_completed: ['block_domain', 'notify_users'],
-          actions_pending: ['update_firewall', 'create_ticket'],
-          affected_assets: 23,
-          risk_score: 87
+          actions_pending: ['update_firewall'],
+          affected_assets: 3,
+          risk_score: 85
         },
         {
           id: 2,
-          title: 'Malware File Upload Attempt',
+          type: 'malware',
           severity: 'critical',
-          status: 'contained',
-          detected_at: new Date(Date.now() - 3600000),
+          status: 'containment',
+          detected_at: new Date(Date.now() - 600000),
           workflow_triggered: 'Malware Detection Response',
-          actions_completed: ['quarantine_file', 'scan_network', 'notify_admin'],
-          actions_pending: ['update_signatures'],
-          affected_assets: 5,
-          risk_score: 94
+          actions_completed: ['quarantine_file', 'isolate_system'],
+          actions_pending: ['scan_network'],
+          affected_assets: 1,
+          risk_score: 95
         },
         {
           id: 3,
-          title: 'Suspicious Login Pattern',
+          type: 'suspicious_activity',
           severity: 'medium',
           status: 'monitoring',
           detected_at: new Date(Date.now() - 900000),
@@ -117,9 +132,6 @@ const IncidentResponse = () => {
           last_triggered: new Date(Date.now() - 3600000)
         }
       ]);
-    } catch (error) {
-      console.error('Error loading incident data:', error);
-      showError('Failed to load incident response data');
     } finally {
       setLoading(false);
     }

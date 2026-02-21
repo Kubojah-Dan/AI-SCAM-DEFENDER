@@ -16,6 +16,7 @@ import IntelligencePage from "./pages/IntelligencePage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import ResponsePage from "./pages/ResponsePage";
 import CommunityPage from "./pages/CommunityPage";
+import SandboxPage from "./pages/SandboxPage";
 
 function AppWithToast() {
   const { toasts, removeToast } = useToast();
@@ -116,6 +117,15 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <CommunityPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/sandbox"
+            element={
+              <ProtectedRoute>
+                <SandboxPage />
               </ProtectedRoute>
             }
           />

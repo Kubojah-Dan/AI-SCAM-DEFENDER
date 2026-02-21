@@ -17,15 +17,14 @@ const MLTrainingQueue = () => {
   const loadQueueStats = async () => {
     setLoading(true);
     try {
-      // In a real implementation, this would call an API endpoint
-      // const response = await apiRequest('/ml/training-stats');
+      const token = localStorage.getItem('scam_defender_token');
+      const response = await apiRequest('/ml/training-stats', { token });
       
-      // Mock data for demonstration
       setQueueStats({
-        pendingItems: 47,
-        processedToday: 23,
-        accuracyImprovement: 4.2,
-        lastTraining: new Date(Date.now() - 86400000).toISOString()
+        pendingItems: response.pendingItems || 0,
+        processedToday: response.processedToday || 0,
+        accuracyImprovement: response.accuracyImprovement || 0,
+        lastTraining: response.lastTraining || null
       });
     } catch (error) {
       console.error('Error loading training stats:', error);

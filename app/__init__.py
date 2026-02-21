@@ -29,7 +29,7 @@ class AppConfig:
 
     raw_origins = os.getenv(
         "ALLOWED_ORIGINS",
-        "http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173",
+        "http://localhost:5173,http://localhost:4173,http://localhost:5174",
     )
     CORS_ORIGINS = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
 
@@ -108,10 +108,12 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     from app.api import api_bp
     from app.api_extended import extended_api_bp
     from app.api_test import test_api_bp
+    from app.sandbox_api import sandbox_bp
 
     app.register_blueprint(api_bp, url_prefix="/api")
     app.register_blueprint(extended_api_bp, url_prefix="/api")
     app.register_blueprint(test_api_bp, url_prefix="/api")
+    app.register_blueprint(sandbox_bp, url_prefix="/api")
 
     with app.app_context():
         db.create_all()

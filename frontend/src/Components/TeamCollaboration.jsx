@@ -73,7 +73,7 @@ const TeamCollaboration = () => {
         status: 'analyzing'
       }
     ]);
-  }, []);
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

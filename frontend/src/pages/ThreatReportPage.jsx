@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import AppShell from '../Components/AppShell';
 import { useToast } from '../Components/Toast';
 import { useAuth } from '../context/AuthContext';
+import { apiRequest } from '../api/client';
 import { FiAlertTriangle, FiMail, FiMessageSquare, FiLink, FiFile, FiCreditCard, FiSend } from 'react-icons/fi';
 
 export default function ThreatReportPage() {
@@ -38,16 +39,19 @@ export default function ThreatReportPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!reportData.content.trim()) {
+      showError('Please provide the threat content to report');
+      return;
+    }
+    
     setIsSubmitting(true);
-
+    
     try {
-      const response = await fetch('http://localhost:5000/api/report-threat', {
+      await apiRequest('/report-threat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
+        token,
+        body: {
           content_type: reportData.threatType,
           content: reportData.content,
           title: reportData.title,
@@ -56,14 +60,9 @@ export default function ThreatReportPage() {
           is_urgent: reportData.isUrgent,
           reporter_name: localStorage.getItem('userName') || 'Anonymous',
           timestamp: new Date().toISOString()
-        })
+        }
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to submit threat report');
-      }
-
-      const result = await response.json();
       showSuccess('Threat report submitted successfully! Thank you for helping keep our community safe.');
       setSubmitSuccess(true);
       

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FiTrendingUp, FiBarChart2, FiPieChart, FiActivity, FiCalendar, FiFilter, FiDownload, FiRefreshCw } from 'react-icons/fi';
 import { useToast } from './Toast';
+import { apiRequest } from '../api/client';
 
 const AdvancedAnalytics = () => {
   const [analyticsData, setAnalyticsData] = useState({
@@ -17,7 +18,24 @@ const AdvancedAnalytics = () => {
   const loadAnalyticsData = async () => {
     setLoading(true);
     try {
-      // Mock comprehensive analytics data
+      const token = localStorage.getItem('scam_defender_token');
+      
+      // Load analytics data from backend
+      const trendsResponse = await apiRequest(`/analytics/trends?range=${dateRange}`, { token });
+      const metricsResponse = await apiRequest(`/analytics/metrics?range=${dateRange}`, { token });
+      const geoResponse = await apiRequest('/analytics/geographic', { token });
+      const performanceResponse = await apiRequest('/analytics/performance', { token });
+      
+      setAnalyticsData({
+        threatTrends: trendsResponse.trends || [],
+        scanMetrics: metricsResponse.metrics || [],
+        geographicData: geoResponse.geographic || [],
+        timeSeriesData: trendsResponse.timeSeries || [],
+        performanceMetrics: performanceResponse.performance || {}
+      });
+    } catch (error) {
+      console.error('Error loading analytics data:', error);
+      // Fallback to mock data
       setAnalyticsData({
         threatTrends: [
           { date: '2024-01-15', phishing: 45, malware: 23, social_engineering: 67, fraud: 12 },
@@ -70,9 +88,6 @@ const AdvancedAnalytics = () => {
           uptime: 99.9
         }
       });
-    } catch (error) {
-      console.error('Error loading analytics:', error);
-      showError('Failed to load analytics data');
     } finally {
       setLoading(false);
     }

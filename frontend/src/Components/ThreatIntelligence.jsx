@@ -19,7 +19,29 @@ const ThreatIntelligence = () => {
   const loadThreatIntelligence = async () => {
     setLoading(true);
     try {
-      // Mock data for demonstration
+      const token = localStorage.getItem('scam_defender_token');
+      
+      // Load external feeds
+      const feedsResponse = await apiRequest('/intelligence/feeds', { token });
+      
+      // Load internal IOCs
+      const iocsResponse = await apiRequest('/intelligence/iocs', { token });
+      
+      // Load threat trends
+      const trendsResponse = await apiRequest('/intelligence/trends', { token });
+      
+      // Load sharing status
+      const sharingResponse = await apiRequest('/intelligence/sharing', { token });
+      
+      setIntelligenceData({
+        externalFeeds: feedsResponse.feeds || [],
+        internalIOCs: iocsResponse.iocs || [],
+        threatTrends: trendsResponse.trends || [],
+        sharingStatus: sharingResponse.status || {}
+      });
+    } catch (error) {
+      console.error('Error loading threat intelligence:', error);
+      // Fallback to mock data
       setIntelligenceData({
         externalFeeds: [
           {

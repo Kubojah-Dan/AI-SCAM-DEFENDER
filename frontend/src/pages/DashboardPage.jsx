@@ -97,10 +97,16 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!token) {
+      console.log('No token found, skipping dashboard load');
+      return;
+    }
+    loadDashboard();
+  }, [token, loadDashboard]);
+
+  useEffect(() => {
+    if (!token) {
       return undefined;
     }
-
-    loadDashboard();
 
     const stream = new EventSource(`${API_BASE}/stream/alerts?token=${encodeURIComponent(token)}`);
 
@@ -224,6 +230,19 @@ export default function DashboardPage() {
 
         {/* Navigation Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <Link
+            to="/sandbox"
+            className="bg-purple-900/30 border border-purple-600/50 rounded-lg p-4 hover:border-purple-500 transition-colors group"
+          >
+            <div className="flex items-center space-x-3">
+              <FiShield className="w-8 h-8 text-purple-400 group-hover:text-purple-300" />
+              <div>
+                <h3 className="text-white font-semibold">Sandbox Analysis</h3>
+                <p className="text-gray-400 text-sm">Secure isolated analysis environment</p>
+              </div>
+            </div>
+          </Link>
+          
           <Link
             to="/report"
             className="bg-red-900/30 border border-red-600/50 rounded-lg p-4 hover:border-red-500 transition-colors group"

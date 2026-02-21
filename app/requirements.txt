@@ -19,6 +19,9 @@ transformers==4.51.3
 torch==2.7.0
 safetensors==0.5.3
 
+python-magic==0.4.27
+pyyara==4.3.0
+
 celery==5.5.1
 redis==5.2.1
 requests==2.32.3

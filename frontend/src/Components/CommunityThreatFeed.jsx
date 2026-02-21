@@ -70,7 +70,7 @@ const CommunityThreatFeed = () => {
     setLoading(true);
     try {
       const response = await apiRequest('/community/threats', {
-        // Add token if needed
+        token: localStorage.getItem('scam_defender_token')
       });
       
       setThreats(response.threats || []);
@@ -81,7 +81,7 @@ const CommunityThreatFeed = () => {
       });
     } catch (error) {
       console.error('Error loading threat feed:', error);
-      // Set mock data for development
+      // Set mock data only if API fails
       setThreats([
         {
           id: 1,
